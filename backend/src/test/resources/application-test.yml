@@ -1,0 +1,16 @@
+spring:
+  main:
+    banner-mode: off
+
+logging:
+  level:
+    root: warn
+
+docentia:
+  jwt:
+    secreto: secreto-exclusivo-para-las-pruebas-automatizadas
+  ia:
+    habilitado: true
+    proveedor: simulado
+    worker:
+      habilitado: false

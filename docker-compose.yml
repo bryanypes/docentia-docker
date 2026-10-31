@@ -1,0 +1,40 @@
+# Levanta la aplicación completa: docker compose up --build
+name: docentia
+
+services:
+  base:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: docentia
+      POSTGRES_USER: ${DOCENTIA_DB_USUARIO:-docentia}
+      POSTGRES_PASSWORD: ${DOCENTIA_DB_CONTRASENA:-docentia}
+    volumes:
+      - datos:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d docentia"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    depends_on:
+      base:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      DOCENTIA_DB_URL: jdbc:postgresql://base:5432/docentia
+      DOCENTIA_DB_USUARIO: ${DOCENTIA_DB_USUARIO:-docentia}
+      DOCENTIA_DB_CONTRASENA: ${DOCENTIA_DB_CONTRASENA:-docentia}
+    ports:
+      - "${DOCENTIA_API_PUERTO:-8090}:8080"
+
+  web:
+    build: ./frontend
+    depends_on:
+      - api
+    ports:
+      - "${DOCENTIA_WEB_PUERTO:-5173}:80"
+
+volumes:
+  datos:
