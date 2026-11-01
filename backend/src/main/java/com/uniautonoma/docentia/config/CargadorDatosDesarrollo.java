@@ -24,6 +24,7 @@ import com.uniautonoma.docentia.repository.UsuarioRepository;
 import com.uniautonoma.docentia.service.CalificacionService;
 import com.uniautonoma.docentia.service.PromedioService;
 import com.uniautonoma.docentia.service.importacion.ValidadorEvaluacionEstudiantes;
+import com.uniautonoma.docentia.service.notificacion.SilencioNotificaciones;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -33,7 +34,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Crea usuarios y datos de ejemplo para trabajar en local mientras no exista el SSO. Solo corre con
@@ -55,6 +56,7 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
   private final PromedioService promedioService;
   private final PasswordEncoder passwordEncoder;
   private final String contrasenaInicial;
+  private final TransactionTemplate transaccion;
   private final ImportacionRepository importacionRepository;
   private final ComentarioEstudianteRepository comentarioRepository;
   private final FranjaHorariaRepository franjaRepository;
@@ -72,7 +74,9 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
       CalificacionService calificacionService,
       PromedioService promedioService,
       PasswordEncoder passwordEncoder,
-      @Value("${docentia.desarrollo.contrasena-inicial}") String contrasenaInicial) {
+      @Value("${docentia.desarrollo.contrasena-inicial}") String contrasenaInicial,
+      TransactionTemplate transaccion) {
+    this.transaccion = transaccion;
     this.importacionRepository = importacionRepository;
     this.comentarioRepository = comentarioRepository;
     this.franjaRepository = franjaRepository;
@@ -88,9 +92,21 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
     this.contrasenaInicial = contrasenaInicial;
   }
 
+  /**
+   * El seed no es un suceso real: nada de lo que crea avisa a nadie. El silencio envuelve la
+   * transacción porque los avisos salen después del commit.
+   */
   @Override
-  @Transactional
   public void run(String... args) {
+    SilencioNotificaciones.activar();
+    try {
+      transaccion.executeWithoutResult(estado -> cargar());
+    } finally {
+      SilencioNotificaciones.desactivar();
+    }
+  }
+
+  private void cargar() {
     if (usuarioRepository.count() > 0) {
       return;
     }
@@ -122,6 +138,9 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
     Usuario julian = crearDocente("Julián Camilo Hoyos", "julian.hoyos", hash, software);
     Usuario diana = crearDocente("Diana Marcela Astaiza", "diana.astaiza", hash, software);
     crearDocente("Óscar Iván Chantre", "oscar.chantre", hash, electronica);
+    Usuario nora = crearDocente("Nora Patricia Muñoz", "nora.munoz", hash, software);
+    Usuario camilo = crearDocente("Camilo Andrés Vidal", "camilo.vidal", hash, software);
+    Usuario ramiro = crearDocente("Ramiro Antonio Paz", "ramiro.paz", hash, electronica);
     crearDocente("Luisa Fernanda Mosquera", "luisa.mosquera", hash, programaDerecho);
     crearDocente("Héctor Fabio Quilindo", "hector.quilindo", hash, programaDerecho);
 
@@ -134,17 +153,23 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
     // completo (Julián: 4.04 con los pesos 50/30/20).
     calificar(julian, periodoAnterior, FuenteEvaluacion.ESTUDIANTES, null, "4.2");
     calificar(julian, periodoAnterior, FuenteEvaluacion.COORDINACION, coordinadorIngenieria, "3.8");
-    calificar(julian, periodoAnterior, FuenteEvaluacion.VICERRECTORIA, vicerrector, "4.0");
+    calificar(julian, periodoAnterior, FuenteEvaluacion.AUTOEVALUACION, julian, "4.0");
 
     // En el activo, Julián y Diana tienen las tres fuentes y su promedio sale completo (4.34 y
     // 4.31); Óscar, Luisa y Héctor siguen sin calificar para mostrar el caso incompleto. La nota de
     // estudiantes entra por el mismo camino que usará la importación desde Campus.
     calificar(julian, periodoActivo, FuenteEvaluacion.COORDINACION, coordinadorIngenieria, "4.3");
-    calificar(julian, periodoActivo, FuenteEvaluacion.VICERRECTORIA, vicerrector, "4.0");
+    calificar(julian, periodoActivo, FuenteEvaluacion.AUTOEVALUACION, julian, "4.0");
     calificarEstudiantes(julian, periodoActivo, "4.5");
     calificar(diana, periodoActivo, FuenteEvaluacion.COORDINACION, coordinadorIngenieria, "4.6");
-    calificar(diana, periodoActivo, FuenteEvaluacion.VICERRECTORIA, vicerrector, "4.4");
+    calificar(diana, periodoActivo, FuenteEvaluacion.AUTOEVALUACION, diana, "4.4");
     calificarEstudiantes(diana, periodoActivo, "4.1");
+
+    // Un docente en cada extremo de la escala de la Resolución 074 para mostrar categorías y
+    // acciones: Nora con 2.85 (bajo, plan de mejoramiento), Camilo 4.75 y Ramiro 1.90.
+    calificarTresFuentes(nora, periodoActivo, coordinadorIngenieria, "2.8", "2.9", "2.9");
+    calificarTresFuentes(camilo, periodoActivo, coordinadorIngenieria, "4.8", "4.7", "4.7");
+    calificarTresFuentes(ramiro, periodoActivo, coordinadorIngenieria, "1.9", "1.9", "1.9");
 
     // Comentarios de estudiantes como si vinieran del CSV de Power BI. Julián tiene 13 encuestas
     // cerradas (alcanza para el análisis con IA) y dos de sus comentarios son ofensivos o sobre su
@@ -214,6 +239,12 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
             periodoAnterior,
             "Actualizar el microcurrículo de Arquitectura de Software",
             LocalDate.of(2026, 12, 1)));
+    compromisoRepository.save(
+        new Compromiso(
+            julian,
+            periodoAnterior,
+            "Entregar el plan de asignatura firmado por el programa",
+            LocalDate.of(2026, 9, 30)));
   }
 
   private void cargarComentarios(
@@ -257,13 +288,13 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
         LocalDate.of(2026, 9, 28),
         LocalDate.of(2026, 11, 13));
     // En desarrollo las etapas se solapan para poder demostrar todo el flujo entre la demo del
-    // sprint y la entrega del 6 de noviembre; en producción las define la vicerrectoría.
+    // sprint y la entrega de noviembre; en producción las define la vicerrectoría.
     periodo.programarEtapa(
         TipoEtapa.REVISION_HALLAZGOS, LocalDate.of(2026, 10, 13), LocalDate.of(2026, 11, 20));
     periodo.programarEtapa(
         TipoEtapa.AGENDA_CITAS, LocalDate.of(2026, 10, 13), LocalDate.of(2026, 11, 27));
     periodo.programarEtapa(
-        TipoEtapa.FIRMA_ACTAS, LocalDate.of(2026, 11, 30), LocalDate.of(2026, 12, 4));
+        TipoEtapa.FIRMA_ACTAS, LocalDate.of(2026, 10, 13), LocalDate.of(2026, 12, 4));
     periodo.setEsActivo(true);
     return periodoRepository.save(periodo);
   }
@@ -278,6 +309,18 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
     calificacion.registrar(notasIguales(nota), null, evaluador);
     calificacionRepository.saveAndFlush(calificacion);
     promedioService.recalcular(docente.getIdUsuario(), periodo.getIdPeriodo());
+  }
+
+  private void calificarTresFuentes(
+      Usuario docente,
+      PeriodoAcademico periodo,
+      Usuario coordinador,
+      String estudiantes,
+      String coordinacion,
+      String autoevaluacion) {
+    calificar(docente, periodo, FuenteEvaluacion.COORDINACION, coordinador, coordinacion);
+    calificar(docente, periodo, FuenteEvaluacion.AUTOEVALUACION, docente, autoevaluacion);
+    calificarEstudiantes(docente, periodo, estudiantes);
   }
 
   private void calificarEstudiantes(Usuario docente, PeriodoAcademico periodo, String nota) {

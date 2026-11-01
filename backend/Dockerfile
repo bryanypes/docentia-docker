@@ -1,15 +1,25 @@
-# Compila con Maven y JDK 21; la imagen final solo lleva el JRE y el jar.
-FROM maven:3.9-eclipse-temurin-21 AS compilacion
-WORKDIR /app
-COPY pom.xml .
-RUN mvn -q -B dependency:go-offline
-COPY src src
-RUN mvn -q -B package -DskipTests
+FROM maven:3.9-eclipse-temurin-21 AS builder
 
-FROM eclipse-temurin:21-jre
-RUN useradd --system --no-create-home docentia
 WORKDIR /app
-COPY --from=compilacion /app/target/*.jar app.jar
+
+COPY pom.xml ./
+RUN mvn -B -DskipTests dependency:resolve dependency:resolve-plugins
+
+COPY src ./src
+RUN mvn -B -DskipTests package \
+    && mv target/docentia-*.jar /app/app.jar
+
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+RUN addgroup -S docentia \
+    && adduser -S docentia -G docentia
+
+COPY --from=builder --chown=docentia:docentia /app/app.jar /app/app.jar
+
 USER docentia
+
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-Duser.timezone=America/Bogota", "-jar", "/app/app.jar"]

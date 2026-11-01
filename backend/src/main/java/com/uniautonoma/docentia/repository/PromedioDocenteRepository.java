@@ -1,8 +1,11 @@
 package com.uniautonoma.docentia.repository;
 
+import com.uniautonoma.docentia.dto.EstadoPromedio;
 import com.uniautonoma.docentia.dto.PromedioPonderadoResponse;
+import com.uniautonoma.docentia.entity.FuenteEvaluacion;
 import com.uniautonoma.docentia.entity.PromedioDocente;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -22,6 +25,23 @@ public interface PromedioDocenteRepository extends JpaRepository<PromedioDocente
       Long idDocente, Long idPeriodo);
 
   /**
+   * Promedios clasificados de un periodo con el docente y su programa.
+   *
+   * @param idFacultad facultad del programa del docente, o nulo para toda la institución
+   */
+  @Query(
+      """
+      select p from PromedioDocente p
+      join fetch p.docente d
+      join fetch d.programa pr
+      where p.periodo.idPeriodo = :idPeriodo
+        and p.categoria is not null
+        and (cast(:idFacultad as Long) is null or pr.facultad.idFacultad = :idFacultad)
+      order by p.valor asc, d.nombreCompleto asc
+      """)
+  List<PromedioDocente> listarClasificados(Long idPeriodo, Long idFacultad);
+
+  /**
    * Lee el promedio guardado sin cargar la entidad, así nunca se responde con una copia vieja que
    * haya quedado en memoria después de {@link #guardar}.
    *
@@ -38,6 +58,23 @@ public interface PromedioDocenteRepository extends JpaRepository<PromedioDocente
       """)
   Optional<PromedioPonderadoResponse> leerPromedio(Long idDocente, Long idPeriodo);
 
+  /** Promedio de un docente, sin cargar la entidad. */
+  record PromedioDeDocente(
+      Long idDocente,
+      EstadoPromedio estado,
+      BigDecimal valor,
+      List<FuenteEvaluacion> fuentesPendientes) {}
+
+  /** Promedios guardados de un periodo, en una sola consulta. */
+  @Query(
+      """
+      select new com.uniautonoma.docentia.repository.PromedioDocenteRepository$PromedioDeDocente(
+          p.docente.idUsuario, p.estado, p.valor, p.fuentesPendientes)
+      from PromedioDocente p
+      where p.periodo.idPeriodo = :idPeriodo
+      """)
+  List<PromedioDeDocente> buscarDelPeriodo(Long idPeriodo);
+
   /**
    * Inserta o reemplaza el promedio de un docente en un periodo en una sola sentencia. Con la
    * restricción única por docente y periodo, dos recálculos simultáneos no pueden crear dos filas
@@ -50,16 +87,24 @@ public interface PromedioDocenteRepository extends JpaRepository<PromedioDocente
       value =
           """
           insert into promedios_docente
-              (id_docente, id_periodo, valor, estado, fuentes_pendientes, fecha_calculo)
+              (id_docente, id_periodo, valor, estado, categoria, fuentes_pendientes, fecha_calculo)
           values (:idDocente, :idPeriodo, cast(:valor as numeric), :estado,
+                  cast(:categoria as varchar),
                   cast(:fuentesPendientes as varchar), clock_timestamp())
           on conflict (id_docente, id_periodo) do update set
               valor = excluded.valor,
               estado = excluded.estado,
+              categoria = excluded.categoria,
               fuentes_pendientes = excluded.fuentes_pendientes,
-              fecha_calculo = excluded.fecha_calculo
+              fecha_calculo = excluded.fecha_calculo,
+              version_bloqueo = promedios_docente.version_bloqueo + 1
           """,
       nativeQuery = true)
   void guardar(
-      Long idDocente, Long idPeriodo, BigDecimal valor, String estado, String fuentesPendientes);
+      Long idDocente,
+      Long idPeriodo,
+      BigDecimal valor,
+      String estado,
+      String categoria,
+      String fuentesPendientes);
 }

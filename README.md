@@ -1,9 +1,11 @@
 # DOCENTIA
 
+[![CI](https://github.com/bryanypes/docentia-docker/actions/workflows/ci.yml/badge.svg)](https://github.com/bryanypes/docentia-docker/actions/workflows/ci.yml)
+
 Sistema de evaluación docente de la Corporación Universitaria Autónoma del Cauca.
 
-| Carpeta     | Contenido                                   |
-| ----------- | ------------------------------------------- |
+| Carpeta             | Contenido                                   |
+| ------------------- | ------------------------------------------- |
 | `backend/`  | API REST: Spring Boot, Java 21 y PostgreSQL |
 | `frontend/` | Aplicación web: React con Vite              |
 
@@ -12,11 +14,25 @@ Sistema de evaluación docente de la Corporación Universitaria Autónoma del Ca
 Solo necesitas Docker Desktop abierto:
 
 ```bash
+git clone -b main https://github.com/bryanypes/docentia-docker.git
+cd docentia-docker
 docker compose up --build -d
 ```
 
-La aplicación queda en <http://localhost:5173> y la API en <http://localhost:8090/api>. Los usuarios
-de demo están en `backend/README.md`; la contraseña es `Docentia2026*`.
+| Servicio   | Dirección                     |
+| ---------- | ----------------------------- |
+| Aplicación | <http://localhost:5173>       |
+| API        | <http://localhost:8080/api>   |
+| PostgreSQL | `localhost:5433`              |
+
+Los usuarios de demo están en `backend/README.md`; su contraseña es `Docentia2026*`. Para
+el flujo de actas, entra con `coordinacion.ingenieria@uniautonoma.edu.co` y `nora.munoz@uniautonoma.edu.co`,
+y para correcciones con `vicerrectoria@uniautonoma.edu.co`.
+
+En desarrollo sin Docker, el frontend apunta al backend con `DOCENTIA_API_URL`
+(`DOCENTIA_API_URL=http://localhost:8081 npm run dev`). El backend usa el perfil `dev` para cargar
+los datos de ejemplo. `DOCENTIA_COMPROMISOS_UMBRAL` y `DOCENTIA_ACTAS_ROL_CORRECTOR` configuran las
+reglas de la Resolución 074.
 
 ```bash
 docker compose logs -f api   # ver el arranque del backend
@@ -24,7 +40,18 @@ docker compose down          # apagar y conservar los datos
 docker compose down -v       # apagar y borrar los datos; al subir vuelve el seed
 ```
 
-Para cambiar puertos o credenciales de desarrollo, copia `.env.example` como `.env`.
+Si algún puerto está ocupado, copia `.env.example` como `.env` y cambia `POSTGRES_PORT`, `API_PORT`
+o `WEB_PORT`. El archivo `.env` no se sube al repositorio.
 
-El recorrido de demo está en `frontend/docs/checklist-demo-sprint3.md`, y el contrato de la API en
-`backend/docs/`.
+Los correos de desarrollo se ven en <http://localhost:8025>. La operación completa está en
+`backend/docs/OPERACION.md`; la arquitectura en `ARQUITECTURA.md`, la API en `API.md`, la
+seguridad en `SEGURIDAD.md`, las notificaciones en `NOTIFICACIONES.md` y los límites en `LIMITACIONES.md`.
+
+El recorrido de demo está en `frontend/docs/checklist-demo-sprint3.md` y el contrato de la API en
+`backend/docs/`. Las decisiones y la trazabilidad con la Resolución 074 están en
+`backend/docs/DECISIONES.md` y `backend/docs/RES074-TRAZABILIDAD.md`.
+
+## Ramas
+
+Se trabaja con GitFlow: `main` y `develop` son permanentes y cada historia sale de `develop` en una
+rama `feature/{id}-{descripcion-corta}`.

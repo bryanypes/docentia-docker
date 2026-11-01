@@ -1,40 +1,100 @@
-# Levanta la aplicación completa: docker compose up --build
+# Arranque local de DOCENTIA, mismo esquema que Unilab:
+#   docker compose up --build
+# Web:  http://localhost:5173
+# API:  http://localhost:8080/api
+# El perfil dev carga usuarios de ejemplo y un modelo de IA simulado.
+# No uses ese perfil fuera de esta máquina.
+# network: host en el build: en este Docker Desktop el DNS de la red bridge no resuelve.
+
 name: docentia
 
 services:
-  base:
+  db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: docentia
-      POSTGRES_USER: ${DOCENTIA_DB_USUARIO:-docentia}
-      POSTGRES_PASSWORD: ${DOCENTIA_DB_CONTRASENA:-docentia}
+      POSTGRES_USER: ${POSTGRES_USER:-docentia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docentia}
+      POSTGRES_DB: ${POSTGRES_DB:-docentia}
     volumes:
-      - datos:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d docentia"]
-      interval: 3s
-      timeout: 3s
-      retries: 20
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Solo desarrollo: atrapa los correos para verlos en el navegador.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
 
   api:
-    build: ./backend
-    depends_on:
-      base:
-        condition: service_healthy
+    image: docentia-api
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      network: host
+    restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      DOCENTIA_DB_URL: jdbc:postgresql://base:5432/docentia
-      DOCENTIA_DB_USUARIO: ${DOCENTIA_DB_USUARIO:-docentia}
-      DOCENTIA_DB_CONTRASENA: ${DOCENTIA_DB_CONTRASENA:-docentia}
+      DOCENTIA_DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-docentia}
+      DOCENTIA_DB_USUARIO: ${POSTGRES_USER:-docentia}
+      DOCENTIA_DB_CONTRASENA: ${POSTGRES_PASSWORD:-docentia}
+      DOCENTIA_JWT_SECRETO: ${DOCENTIA_JWT_SECRETO:-secreto-de-desarrollo-local-no-usar-en-produccion}
+      DOCENTIA_GOOGLE_CLIENT_ID: ${DOCENTIA_GOOGLE_CLIENT_ID:-}
+      DOCENTIA_APP_URL: ${DOCENTIA_APP_URL:-http://localhost:5173}
+      DOCENTIA_MAIL_HOST: ${DOCENTIA_MAIL_HOST:-mailpit}
+      DOCENTIA_MAIL_PORT: ${DOCENTIA_MAIL_PORT:-1025}
+      DOCENTIA_MAIL_USER: ${DOCENTIA_MAIL_USER:-}
+      DOCENTIA_MAIL_PASS: ${DOCENTIA_MAIL_PASS:-}
+      DOCENTIA_MAIL_FROM: ${DOCENTIA_MAIL_FROM:-no-responder@uniautonoma.edu.co}
+      DOCENTIA_MAIL_TLS: ${DOCENTIA_MAIL_TLS:-false}
+      DOCENTIA_COMPROMISOS_UMBRAL: ${DOCENTIA_COMPROMISOS_UMBRAL:-3.8}
+      DOCENTIA_ACTAS_ROL_CORRECTOR: ${DOCENTIA_ACTAS_ROL_CORRECTOR:-VICERRECTOR}
+      DOCENTIA_IA_HABILITADO: ${DOCENTIA_IA_HABILITADO:-true}
+      DOCENTIA_IA_PROVEEDOR: ${DOCENTIA_IA_PROVEEDOR:-simulado}
+      DOCENTIA_IA_URL_BASE: ${DOCENTIA_IA_URL_BASE:-}
+      DOCENTIA_IA_MODELO: ${DOCENTIA_IA_MODELO:-}
+      DOCENTIA_IA_CLAVE: ${DOCENTIA_IA_CLAVE:-}
     ports:
-      - "${DOCENTIA_API_PUERTO:-8090}:8080"
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/api/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    stop_grace_period: 30s
 
   web:
-    build: ./frontend
-    depends_on:
-      - api
+    image: docentia-web
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      network: host
+      args:
+        VITE_API_URL: /api
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    restart: unless-stopped
     ports:
-      - "${DOCENTIA_WEB_PUERTO:-5173}:80"
+      - "${WEB_PORT:-5173}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
-  datos:
+  postgres_data:

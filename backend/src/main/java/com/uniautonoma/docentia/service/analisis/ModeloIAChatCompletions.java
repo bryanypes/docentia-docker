@@ -68,7 +68,8 @@ public class ModeloIAChatCompletions implements ModeloIA {
     ObjectNode cuerpo = objectMapper.createObjectNode();
     cuerpo.put("model", modelo);
     cuerpo.put("temperature", 0);
-    cuerpo.putObject("response_format").put("type", "json_object");
+    cuerpo.put("max_tokens", 4096);
+    cuerpo.set("response_format", formatoJson());
     ArrayNode mensajes = cuerpo.putArray("messages");
     mensajes.addObject().put("role", "system").put("content", peticion.instruccion());
     ObjectNode entrada = objectMapper.createObjectNode();
@@ -90,6 +91,48 @@ public class ModeloIAChatCompletions implements ModeloIA {
     } catch (JsonProcessingException excepcion) {
       throw new ModeloIAException("No se pudo armar la petición", excepcion);
     }
+  }
+
+  /**
+   * Algunos proveedores rechazan {@code json_object} en su capa compatible con chat/completions.
+   * {@code json_schema} con {@code strict} funciona en todos los que hablan ese formato.
+   */
+  private ObjectNode formatoJson() {
+    ObjectNode cita = objectMapper.createObjectNode();
+    cita.put("type", "object");
+    cita.put("additionalProperties", false);
+    ObjectNode propiedadesCita = cita.putObject("properties");
+    propiedadesCita.putObject("comentarioId").put("type", "integer");
+    propiedadesCita.putObject("fragmento").put("type", "string");
+    cita.putArray("required").add("comentarioId").add("fragmento");
+
+    ObjectNode hallazgo = objectMapper.createObjectNode();
+    hallazgo.put("type", "object");
+    hallazgo.put("additionalProperties", false);
+    ObjectNode propiedadesHallazgo = hallazgo.putObject("properties");
+    propiedadesHallazgo
+        .putObject("tipo")
+        .put("type", "string")
+        .putArray("enum")
+        .add("fortaleza")
+        .add("oportunidad_de_mejora");
+    propiedadesHallazgo.putObject("texto").put("type", "string");
+    propiedadesHallazgo.putObject("citas").put("type", "array").set("items", cita);
+    hallazgo.putArray("required").add("tipo").add("texto").add("citas");
+
+    ObjectNode raiz = objectMapper.createObjectNode();
+    raiz.put("type", "object");
+    raiz.put("additionalProperties", false);
+    raiz.putObject("properties").putObject("hallazgos").put("type", "array").set("items", hallazgo);
+    raiz.putArray("required").add("hallazgos");
+
+    ObjectNode formato = objectMapper.createObjectNode();
+    formato.put("type", "json_schema");
+    ObjectNode esquema = formato.putObject("json_schema");
+    esquema.put("name", "analisis_comentarios");
+    esquema.put("strict", true);
+    esquema.set("schema", raiz);
+    return formato;
   }
 
   private static void exigir(String valor, String propiedad) {

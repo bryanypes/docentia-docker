@@ -1,3 +1,9 @@
-*
-!pom.xml
-!src
+target
+.git
+.idea
+*.iml
+*.log
+docs
+.env
+.env.*
+application-local.yml

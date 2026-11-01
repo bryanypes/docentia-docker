@@ -3,14 +3,20 @@ import {
   Building2,
   CalendarDays,
   CalendarRange,
+  ChartColumn,
   ClipboardCheck,
+  ClipboardList,
+  FileSignature,
   FileUp,
   GraduationCap,
   KeyRound,
   LayoutDashboard,
+  Lightbulb,
   LogOut,
   MessagesSquare,
+  PenLine,
   Scale,
+  ScrollText,
   UserCog,
   Users,
 } from 'lucide-react'
@@ -18,6 +24,9 @@ import { useEffect, useRef } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { RUTA_CAMBIO_CONTRASENA } from '../../../../app/rutasPorRol.js'
 import { useSesion } from '../../../../features/auth/sesionContext.js'
+import '../../../../features/formularios/components/FormularioInstrumento.css'
+import { obtenerPendientesCoevaluacion } from '../../../../features/formularios/services/formulariosService.js'
+import { useFetch } from '../../../hooks/useFetch.js'
 import { ETIQUETA_ROL, ROLES } from '../../../constants/dominio.js'
 import { iniciales } from '../../../utils/formatters.js'
 import './Sidebar.css'
@@ -25,26 +34,45 @@ import './Sidebar.css'
 const NAVEGACION = {
   [ROLES.DOCENTE]: [
     { ruta: '/mi-evaluacion', etiqueta: 'Mi evaluación', Icono: ClipboardCheck },
+    { ruta: '/mi-autoevaluacion', etiqueta: 'Mi autoevaluación', Icono: PenLine },
     { ruta: '/mi-cita', etiqueta: 'Mi cita', Icono: CalendarDays },
+    { ruta: '/mi-acta', etiqueta: 'Mi acta', Icono: FileSignature },
   ],
   [ROLES.COORDINADOR]: [
     { ruta: '/inicio', etiqueta: 'Inicio', Icono: LayoutDashboard },
     { ruta: '/docentes', etiqueta: 'Docentes', Icono: Users },
+    { ruta: '/coevaluaciones', etiqueta: 'Coevaluaciones', Icono: ClipboardList },
     { ruta: '/importaciones', etiqueta: 'Evaluación de estudiantes', Icono: FileUp },
     { ruta: '/analisis', etiqueta: 'Análisis de comentarios', Icono: MessagesSquare },
     { ruta: '/agenda', etiqueta: 'Agenda de citas', Icono: CalendarDays },
+    { ruta: '/acciones-sugeridas', etiqueta: 'Acciones sugeridas', Icono: Lightbulb },
+    { ruta: '/panel-programas', etiqueta: 'Panel por programa', Icono: ChartColumn },
   ],
   [ROLES.VICERRECTOR]: [
     { ruta: '/inicio', etiqueta: 'Inicio', Icono: LayoutDashboard },
     { ruta: '/docentes', etiqueta: 'Docentes', Icono: Users },
     { ruta: '/importaciones', etiqueta: 'Cargas de estudiantes', Icono: FileUp },
     { ruta: '/analisis', etiqueta: 'Análisis de comentarios', Icono: MessagesSquare },
+    { ruta: '/acciones-sugeridas', etiqueta: 'Acciones sugeridas', Icono: Lightbulb },
+    { ruta: '/panel-programas', etiqueta: 'Panel por programa', Icono: ChartColumn },
     { ruta: '/periodos', etiqueta: 'Periodos', Icono: CalendarRange },
     { ruta: '/ponderaciones', etiqueta: 'Ponderaciones', Icono: Scale },
     { ruta: '/facultades', etiqueta: 'Facultades', Icono: Building2 },
     { ruta: '/programas', etiqueta: 'Programas', Icono: BookOpen },
     { ruta: '/usuarios', etiqueta: 'Usuarios', Icono: UserCog },
+    { ruta: '/auditoria', etiqueta: 'Auditoría', Icono: ScrollText },
   ],
+}
+
+function ContadorCoevaluaciones() {
+  const { datos } = useFetch(obtenerPendientesCoevaluacion)
+  if (!datos?.pendientes) return null
+  return (
+    <span className="menu__contador">
+      {datos.pendientes}
+      <span className="solo-lectores"> pendientes</span>
+    </span>
+  )
 }
 
 export function Sidebar() {
@@ -79,6 +107,7 @@ export function Sidebar() {
           <NavLink key={ruta} to={ruta} className="sidebar__enlace">
             <Icono size={18} strokeWidth={1.75} aria-hidden="true" className="sidebar__icono" />
             {etiqueta}
+            {ruta === '/coevaluaciones' && <ContadorCoevaluaciones />}
           </NavLink>
         ))}
       </nav>

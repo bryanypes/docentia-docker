@@ -55,7 +55,8 @@ class ModeloIAChatCompletionsTest {
         .andExpect(method(HttpMethod.POST))
         .andExpect(header("Authorization", "Bearer clave-de-prueba"))
         .andExpect(jsonPath("$.model").value("modelo-de-prueba"))
-        .andExpect(jsonPath("$.response_format.type").value("json_object"))
+        .andExpect(jsonPath("$.response_format.type").value("json_schema"))
+        .andExpect(jsonPath("$.response_format.json_schema.strict").value(true))
         .andExpect(jsonPath("$.messages[0].content").value("Instrucción versionada"))
         .andExpect(
             jsonPath("$.messages[1].content")

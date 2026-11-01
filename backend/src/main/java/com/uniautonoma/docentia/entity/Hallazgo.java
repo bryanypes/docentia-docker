@@ -14,6 +14,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,6 +24,10 @@ import java.util.List;
 @Entity
 @Table(name = "hallazgos_analisis")
 public class Hallazgo {
+
+  @Version
+  @Column(name = "version_bloqueo", nullable = false)
+  private long versionBloqueo;
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -77,7 +82,7 @@ public class Hallazgo {
 
   /** Deja el estado según las citas; un hallazgo sin citas también queda sin cita verificada. */
   public void actualizarEstadoSegunCitas() {
-    if (estado != EstadoHallazgo.VALIDADO) {
+    if (estado != EstadoHallazgo.VALIDADO && estado != EstadoHallazgo.DESCARTADO) {
       estado =
           tieneCitaVerificada()
               ? EstadoHallazgo.PENDIENTE_VALIDACION
@@ -103,6 +108,17 @@ public class Hallazgo {
       validador = quien;
       fechaValidacion = LocalDateTime.now();
     }
+  }
+
+  /** Lo excluye del resultado; se puede volver a incluir mientras no se publique. */
+  public void descartar() {
+    estado = EstadoHallazgo.DESCARTADO;
+    validador = null;
+    fechaValidacion = null;
+  }
+
+  public void editarTexto(String texto) {
+    this.texto = texto;
   }
 
   public Usuario getValidador() {

@@ -1,24 +1,29 @@
-import { MessagesSquare, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import robotSaludo from '../../../assets/ilustraciones/robot-saludo.svg'
 import { Encabezado } from '../../../shared/components/layout/Encabezado/Encabezado.jsx'
 import { Boton } from '../../../shared/components/ui/Boton/Boton.jsx'
 import { Cargando, EstadoVista } from '../../../shared/components/ui/EstadoVista/EstadoVista.jsx'
 import { EtiquetaNivel } from '../../../shared/components/ui/EtiquetaNivel/EtiquetaNivel.jsx'
 import { MensajeNavegacion } from '../../../shared/components/ui/MensajeNavegacion/MensajeNavegacion.jsx'
-import { Panel } from '../../../shared/components/ui/Panel/Panel.jsx'
 import { useFetch } from '../../../shared/hooks/useFetch.js'
-import { formatearNota, listarFuentes } from '../../../shared/utils/formatters.js'
-import { PanelCompromisos, PanelDimensiones } from '../components/PanelesExpediente.jsx'
+import { formatearNota, listarFuentes, textoFormula } from '../../../shared/utils/formatters.js'
+import { PanelSeguimientoPlan } from '../../actas/components/PanelSeguimientoPlan.jsx'
+import { PanelHallazgosPropios } from '../../analisis/components/PanelHallazgosPropios.jsx'
+import { PanelMiAutoevaluacion } from '../../formularios/components/PanelMiAutoevaluacion.jsx'
+import { obtenerConfiguracionEvaluacion } from '../../kpis/services/configuracionService.js'
+import { LineaTiempo } from '../../periodos/components/LineaTiempo.jsx'
+import { PanelCompromisos } from '../components/PanelesExpediente.jsx'
 import { obtenerExpedientePropio } from '../services/expedientesService.js'
 import './MiEvaluacion.css'
 
 /**
  * Vista del docente. Usa solo ExpedientePropioResponse: no recibe ni muestra las notas
- * individuales de coordinación o vicerrectoría.
+ * individuales de cada fuente ni un promedio parcial.
  */
 export default function MiEvaluacion() {
   const expediente = useFetch(obtenerExpedientePropio)
   const periodoNombre = expediente.datos?.periodo?.nombre
+  const configuracion = useFetch(obtenerConfiguracionEvaluacion)
 
   const encabezado = (
     <Encabezado
@@ -52,7 +57,7 @@ export default function MiEvaluacion() {
     )
   }
 
-  const { periodo, promedio, dimensiones, compromisosVigentes } = expediente.datos
+  const { periodo, promedio, compromisosVigentes } = expediente.datos
   const completo = promedio?.estado === 'COMPLETO'
 
   return (
@@ -66,6 +71,8 @@ export default function MiEvaluacion() {
             mensaje="Cuando la vicerrectoría abra el periodo, tu resultado aparecerá aquí."
           />
         ) : (
+          <>
+          <LineaTiempo />
           <div className="rejilla">
             <section className="mi-evaluacion__resumen">
               <div className="mi-evaluacion__cabecera">
@@ -82,6 +89,12 @@ export default function MiEvaluacion() {
 
               <EtiquetaNivel promedio={promedio} />
 
+              {completo && promedio.categoria && (
+                <p className="mi-evaluacion__texto">
+                  <strong>Acción institucional:</strong> {promedio.categoria.accionInstitucional}
+                </p>
+              )}
+
               <p className="mi-evaluacion__texto">
                 {completo
                   ? 'Promedio ponderado del periodo. Incluye la evaluación de tus estudiantes y las evaluaciones institucionales, que se reportan únicamente dentro de este promedio.'
@@ -90,22 +103,19 @@ export default function MiEvaluacion() {
 
               <div className="mi-evaluacion__fuentes">
                 <div>
-                  <strong>Estudiantes, coordinación y vicerrectoría</strong>
-                  <span>Las tres fuentes se combinan según la ponderación del periodo.</span>
+                  <strong>Estudiantes, coordinación y autoevaluación</strong>
+                  <span>{configuracion.datos ? textoFormula(configuracion.datos) : 'Las tres fuentes se combinan según la ponderación del periodo.'}</span>
                 </div>
                 <span className="mi-evaluacion__chip">Solo en el promedio</span>
               </div>
             </section>
 
-            <PanelDimensiones titulo="Mis dimensiones" dimensiones={dimensiones} />
+            <PanelMiAutoevaluacion />
             <PanelCompromisos titulo="Mis compromisos" compromisos={compromisosVigentes} />
-            <Panel titulo="Lo que dicen tus estudiantes" icono={MessagesSquare}>
-              <p>
-                La coordinación revisa los comentarios de tus estudiantes. Verás las fortalezas y
-                oportunidades de mejora cuando las valide.
-              </p>
-            </Panel>
+            <PanelHallazgosPropios />
           </div>
+          <PanelSeguimientoPlan />
+          </>
         )}
       </div>
     </>

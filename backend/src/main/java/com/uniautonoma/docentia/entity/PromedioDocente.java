@@ -13,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +25,10 @@ import java.util.List;
 @Entity
 @Table(name = "promedios_docente")
 public class PromedioDocente {
+
+  @Version
+  @Column(name = "version_bloqueo", nullable = false)
+  private long versionBloqueo;
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,6 +48,10 @@ public class PromedioDocente {
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private EstadoPromedio estado;
+
+  @Enumerated(EnumType.STRING)
+  @Column(length = 20)
+  private CategoriaDesempeno categoria;
 
   @Convert(converter = FuentesPendientesConverter.class)
   @Column(length = 100)
@@ -66,11 +75,19 @@ public class PromedioDocente {
     return estado;
   }
 
+  public CategoriaDesempeno getCategoria() {
+    return categoria;
+  }
+
   public List<FuenteEvaluacion> getFuentesPendientes() {
     return fuentesPendientes;
   }
 
   public LocalDateTime getFechaCalculo() {
     return fechaCalculo;
+  }
+
+  public Usuario getDocente() {
+    return docente;
   }
 }

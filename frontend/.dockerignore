@@ -1,7 +1,11 @@
 node_modules
 dist
 .git
+.idea
+.vscode
+*.log
+.env
+.env.*
 design
 docs
-.env
-.env.local
+e2e
