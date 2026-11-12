@@ -1,5 +1,7 @@
 # Guion de prueba y demostración
 
+> **Términos en pantalla:** la interfaz dice **evaluadores** (estudiantes, coordinación y autoevaluación) donde la API y esta documentación técnica dicen *fuentes*. Los campos de la API no cambian (por ejemplo, `fuentesPendientes`).
+
 Presentación a Vicerrectoría, jueves 12 de noviembre de 2026. Se presenta **en local con Docker y datos
 de demostración**, sobre la rama `release/0.4.0`. No se usa el servidor de producción, donde la
 recolección real sigue abierta hasta el viernes 13.
@@ -92,6 +94,18 @@ perfil `dev`.
 | Docente | `laura.demo@uniautonoma.edu.co` | 3,50 con 4 respuestas de estudiantes: el caso en vivo |
 | Docente | `oscar.chantre@uniautonoma.edu.co` | Sin notas: sirve para mostrar un promedio PARCIAL |
 | Estudiante | `estudiante.demo5@uniautonoma.edu.co` | Dos evaluaciones pendientes, una de ellas a Laura |
+| Docente | `docente.flujo@uniautonoma.edu.co` | Mariana Ruiz Ortega: sin ninguna nota; 11 estudiantes ya la evaluaron. Flujo limpio de punta a punta |
+| Estudiante | `estudiante.flujo@uniautonoma.edu.co` | Santiago Gómez Ríos: solo le falta evaluar a Mariana |
+| Administración | `administrador.demo@uniautonoma.edu.co` | Usuarios, programas, ponderaciones y fechas |
+| Visualización | `visualizador.demo@uniautonoma.edu.co` | Solo el Panel por programa |
+
+Además hay 36 docentes de estadística (`docente.estadistica1` a `36`) en cinco programas, con notas en
+todos los niveles, para que Estadísticas y el Inicio tengan volumen.
+
+**Flujo corto para presentar (Mariana):** `estudiante.flujo` la evalúa (el comentario es obligatorio) →
+`docente.flujo` hace su autoevaluación → `coordinacion.ingenieria` la coevalúa (en Coevaluaciones,
+buscarla por nombre) y pide el análisis de comentarios → `vicerrectoria` ve su resultado, los
+destacados y las estadísticas.
 
 ## c. Guion de prueba
 
@@ -259,7 +273,7 @@ privada para cambiar de usuario sin cerrar sesión.
 | 4. La nota cambia en vivo | 2 | Coordinación → Laura | «Con menos de cinco respuestas no usamos la opinión de los estudiantes, para proteger su anonimato. Con la quinta, la nota pasa de 3,50 a 4,50.» |
 | 5. Comentarios | 3 | Coordinación → Análisis de comentarios → Julián; luego Diana | «El sistema agrupa lo que dicen los estudiantes en fortalezas y oportunidades, cada una con la frase exacta que la respalda. Corre dentro del servidor; no envía comentarios a ningún servicio externo. Coordinación decide qué se publica. Si hay pocas encuestas, lo dice y no inventa conclusiones.» |
 | 6. El acta | 4 | Coordinación → Nora: generar acta, compromiso, abrir horario; Nora reserva; coordinación registra asistencia y firma; Nora firma y descarga el PDF | «Bajo 3,80 el acta exige compromisos con plazo. El docente ve su resultado en la reunión, no antes. Los dos firman y el PDF lleva un código que cualquiera puede verificar.» |
-| 7. Control | 2 | Vicerrectoría → corregir el acta de Nora → Auditoría | «Un acta firmada no se puede cambiar. Si hay un error, Vicerrectoría crea una versión nueva con el motivo, y todo queda en la auditoría.» |
+| 7. Control | 2 | Vicerrectoría → corregir el acta de Nora → ver la versión 2 en el expediente | «Un acta firmada no se puede cambiar. Si hay un error, Vicerrectoría crea una versión nueva con el motivo, y todo queda en el registro de auditoría, que no tiene pantalla pero se conserva.» |
 | 8. Límites y siguientes pasos | 1 | Sin pantalla | «Quedan decisiones de Vicerrectoría: el umbral de 3,8 o 4,0, qué hacer con docentes con menos de cinco respuestas y el ingreso de estudiantes con la cuenta institucional.» |
 
 ## e. Preguntas probables
