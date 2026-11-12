@@ -1,20 +1,27 @@
 package com.uniautonoma.docentia;
 
 import com.uniautonoma.docentia.entity.Calificacion;
+import com.uniautonoma.docentia.entity.Clase;
 import com.uniautonoma.docentia.entity.ComentarioEstudiante;
+import com.uniautonoma.docentia.entity.Curso;
 import com.uniautonoma.docentia.entity.Facultad;
 import com.uniautonoma.docentia.entity.FuenteEvaluacion;
 import com.uniautonoma.docentia.entity.Importacion;
+import com.uniautonoma.docentia.entity.Matricula;
 import com.uniautonoma.docentia.entity.NotasAspectos;
 import com.uniautonoma.docentia.entity.PeriodoAcademico;
 import com.uniautonoma.docentia.entity.Programa;
 import com.uniautonoma.docentia.entity.ResultadoImportacion;
+import com.uniautonoma.docentia.entity.Rol;
 import com.uniautonoma.docentia.entity.TipoEtapa;
 import com.uniautonoma.docentia.entity.Usuario;
 import com.uniautonoma.docentia.repository.CalificacionRepository;
+import com.uniautonoma.docentia.repository.ClaseRepository;
 import com.uniautonoma.docentia.repository.ComentarioEstudianteRepository;
+import com.uniautonoma.docentia.repository.CursoRepository;
 import com.uniautonoma.docentia.repository.FacultadRepository;
 import com.uniautonoma.docentia.repository.ImportacionRepository;
+import com.uniautonoma.docentia.repository.MatriculaRepository;
 import com.uniautonoma.docentia.repository.PeriodoAcademicoRepository;
 import com.uniautonoma.docentia.repository.ProgramaRepository;
 import com.uniautonoma.docentia.repository.UsuarioRepository;
@@ -41,6 +48,9 @@ public class EscenarioPrueba {
   private final PromedioService promedioService;
   private final ImportacionRepository importacionRepository;
   private final ComentarioEstudianteRepository comentarioRepository;
+  private final CursoRepository cursoRepository;
+  private final ClaseRepository claseRepository;
+  private final MatriculaRepository matriculaRepository;
 
   public EscenarioPrueba(
       FacultadRepository facultadRepository,
@@ -50,7 +60,10 @@ public class EscenarioPrueba {
       CalificacionRepository calificacionRepository,
       PromedioService promedioService,
       ImportacionRepository importacionRepository,
-      ComentarioEstudianteRepository comentarioRepository) {
+      ComentarioEstudianteRepository comentarioRepository,
+      CursoRepository cursoRepository,
+      ClaseRepository claseRepository,
+      MatriculaRepository matriculaRepository) {
     this.promedioService = promedioService;
     this.importacionRepository = importacionRepository;
     this.comentarioRepository = comentarioRepository;
@@ -59,6 +72,9 @@ public class EscenarioPrueba {
     this.usuarioRepository = usuarioRepository;
     this.periodoRepository = periodoRepository;
     this.calificacionRepository = calificacionRepository;
+    this.cursoRepository = cursoRepository;
+    this.claseRepository = claseRepository;
+    this.matriculaRepository = matriculaRepository;
   }
 
   /**
@@ -121,9 +137,32 @@ public class EscenarioPrueba {
     return usuarioRepository.save(Usuario.crearDocente(nombre, correoDe(nombre), HASH, programa));
   }
 
+  public Usuario crearEstudiante(String nombre, Programa programa) {
+    return usuarioRepository.save(
+        Usuario.crearEstudiante(nombre, correoDe(nombre), HASH, programa));
+  }
+
+  public Curso crearCurso(String codigo, String nombre, Programa programa) {
+    return cursoRepository.save(new Curso(codigo, nombre, programa));
+  }
+
+  public Clase crearClase(PeriodoAcademico periodo, Curso curso, String grupo, Usuario docente) {
+    Clase clase = new Clase(periodo, curso, grupo, "S001", "S001");
+    clase.agregarDocente(docente);
+    return claseRepository.saveAndFlush(clase);
+  }
+
+  public Matricula matricular(Clase clase, Usuario estudiante) {
+    return matriculaRepository.saveAndFlush(new Matricula(clase, estudiante));
+  }
+
   public Usuario crearCoordinador(String nombre, Facultad facultad) {
     return usuarioRepository.save(
         Usuario.crearCoordinador(nombre, correoDe(nombre), HASH, facultad));
+  }
+
+  public Usuario crearConRol(String nombre, Rol rol) {
+    return usuarioRepository.save(Usuario.crear(nombre, correoDe(nombre), HASH, rol, null, null));
   }
 
   public Usuario crearVicerrector(String nombre) {

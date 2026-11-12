@@ -2,12 +2,18 @@ export const ROLES = {
   VICERRECTOR: 'VICERRECTOR',
   COORDINADOR: 'COORDINADOR',
   DOCENTE: 'DOCENTE',
+  ESTUDIANTE: 'ESTUDIANTE',
+  ADMINISTRADOR: 'ADMINISTRADOR',
+  VISUALIZADOR: 'VISUALIZADOR',
 }
 
 export const ETIQUETA_ROL = {
   VICERRECTOR: 'Vicerrectoría',
   COORDINADOR: 'Coordinación',
   DOCENTE: 'Docente',
+  ESTUDIANTE: 'Estudiante',
+  ADMINISTRADOR: 'Administración',
+  VISUALIZADOR: 'Visualización',
 }
 
 export const ETIQUETA_FUENTE = {
@@ -17,7 +23,7 @@ export const ETIQUETA_FUENTE = {
 }
 
 export const ORIGEN_FUENTE = {
-  ESTUDIANTES: 'Sincronizado del sistema de encuestas',
+  ESTUDIANTES: 'Formulario de los estudiantes',
   COORDINACION: 'Registrada por coordinación',
   AUTOEVALUACION: 'Registrada por el docente',
 }

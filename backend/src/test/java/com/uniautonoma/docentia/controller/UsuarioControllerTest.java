@@ -58,6 +58,11 @@ class UsuarioControllerTest extends PruebaIntegracion {
     crear(solicitud("vice@prueba.co", Rol.VICERRECTOR, null, null))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.idFacultad").doesNotExist());
+    crear(solicitud("estudiante@prueba.co", Rol.ESTUDIANTE, null, software.getIdPrograma()))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.rol").value("ESTUDIANTE"))
+        .andExpect(jsonPath("$.nombrePrograma").value("Ingeniería de Software"))
+        .andExpect(jsonPath("$.idFacultad").value(ingenieria.getIdFacultad()));
   }
 
   @Test
@@ -69,6 +74,17 @@ class UsuarioControllerTest extends PruebaIntegracion {
     crear(solicitud("b@prueba.co", Rol.DOCENTE, ingenieria.getIdFacultad(), null))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.mensaje").value("El docente debe estar vinculado a un programa"));
+    crear(solicitud("est@prueba.co", Rol.ESTUDIANTE, null, null))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.mensaje").value("El estudiante debe estar vinculado a un programa"));
+    crear(
+            solicitud(
+                "est2@prueba.co",
+                Rol.ESTUDIANTE,
+                derecho.getIdFacultad(),
+                software.getIdPrograma()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.mensaje").value("El programa no pertenece a la facultad indicada"));
     crear(solicitud("c@prueba.co", Rol.VICERRECTOR, ingenieria.getIdFacultad(), null))
         .andExpect(status().isBadRequest());
     crear(solicitud("d@prueba.co", Rol.DOCENTE, derecho.getIdFacultad(), software.getIdPrograma()))
@@ -84,7 +100,7 @@ class UsuarioControllerTest extends PruebaIntegracion {
     mockMvc
         .perform(
             post("/usuarios")
-                .with(comoVicerrector())
+                .with(comoAdministrador())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
@@ -125,7 +141,7 @@ class UsuarioControllerTest extends PruebaIntegracion {
     mockMvc
         .perform(
             put("/usuarios/{id}", docente.getIdUsuario())
-                .with(comoVicerrector())
+                .with(comoAdministrador())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     aJson(
@@ -142,7 +158,7 @@ class UsuarioControllerTest extends PruebaIntegracion {
         .andExpect(jsonPath("$.idPrograma").doesNotExist());
 
     mockMvc
-        .perform(get("/usuarios").param("rol", "COORDINADOR").with(comoVicerrector()))
+        .perform(get("/usuarios").param("rol", "COORDINADOR").with(comoAdministrador()))
         .andExpect(jsonPath("$[*].nombreCompleto", contains("Julian Hoyos")));
   }
 
@@ -151,7 +167,7 @@ class UsuarioControllerTest extends PruebaIntegracion {
     mockMvc
         .perform(
             put("/usuarios/{id}", 999_999)
-                .with(comoVicerrector())
+                .with(comoAdministrador())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(aJson(solicitud("x@prueba.co", Rol.VICERRECTOR, null, null))))
         .andExpect(status().isNotFound());
@@ -164,6 +180,9 @@ class UsuarioControllerTest extends PruebaIntegracion {
 
     mockMvc.perform(get("/usuarios").with(coordinador)).andExpect(status().isForbidden());
     mockMvc.perform(get("/usuarios").with(como(docente))).andExpect(status().isForbidden());
+    mockMvc
+        .perform(get("/usuarios").with(como(escenario.crearEstudiante("Karen Mancilla", software))))
+        .andExpect(status().isForbidden());
     mockMvc
         .perform(
             post("/usuarios")
@@ -221,7 +240,7 @@ class UsuarioControllerTest extends PruebaIntegracion {
   private ResultActions crear(UsuarioRequest solicitud) throws Exception {
     return mockMvc.perform(
         post("/usuarios")
-            .with(comoVicerrector())
+            .with(comoAdministrador())
             .contentType(MediaType.APPLICATION_JSON)
             .content(aJson(solicitud)));
   }

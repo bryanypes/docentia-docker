@@ -17,7 +17,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 /**
  * Persona que ingresa al sistema. El rol determina el alcance: el coordinador queda ligado a una
- * facultad, el docente a un programa y el vicerrector a ninguno de los dos.
+ * facultad, el docente y el estudiante a un programa y el vicerrector a ninguno de los dos.
  */
 @Entity
 @Table(name = "usuarios")
@@ -29,6 +29,9 @@ public class Usuario {
 
   @Column(nullable = false, length = 150)
   private String nombreCompleto;
+
+  @Column(length = 40)
+  private String codigo;
 
   @Column(nullable = false, length = 150)
   private String correo;
@@ -62,7 +65,7 @@ public class Usuario {
   protected Usuario() {}
 
   private Usuario(String nombreCompleto, String correo, String contrasenaHash, Rol rol) {
-    this.nombreCompleto = nombreCompleto;
+    this.nombreCompleto = NombrePropio.normalizar(nombreCompleto);
     this.correo = correo;
     this.contrasenaHash = contrasenaHash;
     this.rol = rol;
@@ -82,13 +85,20 @@ public class Usuario {
     return docente;
   }
 
+  public static Usuario crearEstudiante(
+      String nombreCompleto, String correo, String contrasenaHash, Programa programa) {
+    Usuario estudiante = new Usuario(nombreCompleto, correo, contrasenaHash, Rol.ESTUDIANTE);
+    estudiante.programa = programa;
+    return estudiante;
+  }
+
   public static Usuario crearVicerrector(
       String nombreCompleto, String correo, String contrasenaHash) {
     return new Usuario(nombreCompleto, correo, contrasenaHash, Rol.VICERRECTOR);
   }
 
   /**
-   * Crea un usuario con cualquiera de los tres roles, validando su vínculo.
+   * Crea un usuario con el rol indicado, validando su vínculo.
    *
    * @throws DatosInvalidosException si el vínculo no corresponde al rol
    */
@@ -110,7 +120,7 @@ public class Usuario {
    *
    * @param rol el único rol que tendrá el usuario
    * @param facultad facultad del coordinador; nula para los demás roles
-   * @param programa programa del docente; nulo para los demás roles
+   * @param programa programa del docente o del estudiante; nulo para los demás roles
    * @throws DatosInvalidosException si el vínculo no corresponde al rol
    */
   public void asignarAlcance(Rol rol, Facultad facultad, Programa programa) {
@@ -127,19 +137,20 @@ public class Usuario {
               "El coordinador se vincula a una facultad, no a un programa");
         }
       }
-      case DOCENTE -> {
+      case DOCENTE, ESTUDIANTE -> {
+        String quien = rol == Rol.DOCENTE ? "El docente" : "El estudiante";
         if (programa == null) {
-          throw new DatosInvalidosException("El docente debe estar vinculado a un programa");
+          throw new DatosInvalidosException(quien + " debe estar vinculado a un programa");
         }
         if (facultad != null) {
           throw new DatosInvalidosException(
-              "El docente se vincula a un programa; su facultad es la del programa");
+              quien + " se vincula a un programa; su facultad es la del programa");
         }
       }
-      case VICERRECTOR -> {
+      case VICERRECTOR, ADMINISTRADOR, VISUALIZADOR -> {
         if (facultad != null || programa != null) {
           throw new DatosInvalidosException(
-              "El vicerrector no se vincula a una facultad ni a un programa");
+              "Este rol no se vincula a una facultad ni a un programa");
         }
       }
     }
@@ -157,7 +168,15 @@ public class Usuario {
   }
 
   public void setNombreCompleto(String nombreCompleto) {
-    this.nombreCompleto = nombreCompleto;
+    this.nombreCompleto = NombrePropio.normalizar(nombreCompleto);
+  }
+
+  public String getCodigo() {
+    return codigo;
+  }
+
+  public void setCodigo(String codigo) {
+    this.codigo = codigo;
   }
 
   public String getCorreo() {
