@@ -13,7 +13,7 @@
 
   <groupId>com.uniautonoma</groupId>
   <artifactId>docentia</artifactId>
-  <version>0.3.2</version>
+  <version>0.4.0</version>
   <name>docentia</name>
   <description>Sistema de evaluación docente de la Corporación Universitaria Autónoma del Cauca</description>
 
@@ -135,6 +135,14 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <!-- /actuator/info publica la versión: así se confirma qué quedó desplegado. -->
+            <goals>
+              <goal>build-info</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.jacoco</groupId>

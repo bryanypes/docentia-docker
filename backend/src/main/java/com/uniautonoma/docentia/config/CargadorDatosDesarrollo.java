@@ -10,6 +10,7 @@ import com.uniautonoma.docentia.entity.NotasAspectos;
 import com.uniautonoma.docentia.entity.PeriodoAcademico;
 import com.uniautonoma.docentia.entity.Programa;
 import com.uniautonoma.docentia.entity.ResultadoImportacion;
+import com.uniautonoma.docentia.entity.Rol;
 import com.uniautonoma.docentia.entity.TipoEtapa;
 import com.uniautonoma.docentia.entity.Usuario;
 import com.uniautonoma.docentia.repository.CalificacionRepository;
@@ -23,6 +24,7 @@ import com.uniautonoma.docentia.repository.ProgramaRepository;
 import com.uniautonoma.docentia.repository.UsuarioRepository;
 import com.uniautonoma.docentia.service.CalificacionService;
 import com.uniautonoma.docentia.service.PromedioService;
+import com.uniautonoma.docentia.service.campus.CargadorClasesCampus;
 import com.uniautonoma.docentia.service.importacion.ValidadorEvaluacionEstudiantes;
 import com.uniautonoma.docentia.service.notificacion.SilencioNotificaciones;
 import java.math.BigDecimal;
@@ -60,6 +62,9 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
   private final ImportacionRepository importacionRepository;
   private final ComentarioEstudianteRepository comentarioRepository;
   private final FranjaHorariaRepository franjaRepository;
+  private final CargadorClasesCampus cargadorClasesCampus;
+  private final SemillaHeteroevaluacion semillaHeteroevaluacion;
+  private final SemillaDemoVicerrectoria semillaDemoVicerrectoria;
 
   public CargadorDatosDesarrollo(
       FranjaHorariaRepository franjaRepository,
@@ -75,7 +80,12 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
       PromedioService promedioService,
       PasswordEncoder passwordEncoder,
       @Value("${docentia.desarrollo.contrasena-inicial}") String contrasenaInicial,
-      TransactionTemplate transaccion) {
+      TransactionTemplate transaccion,
+      CargadorClasesCampus cargadorClasesCampus,
+      SemillaHeteroevaluacion semillaHeteroevaluacion,
+      SemillaDemoVicerrectoria semillaDemoVicerrectoria) {
+    this.semillaHeteroevaluacion = semillaHeteroevaluacion;
+    this.semillaDemoVicerrectoria = semillaDemoVicerrectoria;
     this.transaccion = transaccion;
     this.importacionRepository = importacionRepository;
     this.comentarioRepository = comentarioRepository;
@@ -90,6 +100,7 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
     this.promedioService = promedioService;
     this.passwordEncoder = passwordEncoder;
     this.contrasenaInicial = contrasenaInicial;
+    this.cargadorClasesCampus = cargadorClasesCampus;
   }
 
   /**
@@ -107,10 +118,22 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
   }
 
   private void cargar() {
-    if (usuarioRepository.count() > 0) {
-      return;
-    }
     String hash = passwordEncoder.encode(contrasenaInicial);
+    if (usuarioRepository.count() == 0) {
+      sembrarCatalogoLocal(hash);
+    }
+    // El recorte Campus es idempotente: tiene que correr también si la base ya tenía el seed
+    // de Ingeniería/Derecho (si no, Karen no existe y el login responde 401).
+    periodoRepository
+        .findByEsActivoTrue()
+        .ifPresent(periodo -> cargadorClasesCampus.cargarDemo(periodo, hash));
+    // Igual que Campus: corre también sobre una base que ya tenía el seed.
+    semillaHeteroevaluacion.cargarSiFalta(hash);
+    // Flujo limpio y volumen para presentar a la vicerrectoría; también sobre una base existente.
+    semillaDemoVicerrectoria.cargarSiFalta(hash);
+  }
+
+  private void sembrarCatalogoLocal(String hash) {
 
     Facultad ingenieria = facultadRepository.save(new Facultad("Facultad de Ingeniería"));
     Facultad derecho =
@@ -123,6 +146,22 @@ public class CargadorDatosDesarrollo implements CommandLineRunner {
     Usuario vicerrector =
         usuarioRepository.save(
             Usuario.crearVicerrector("Elena Muñoz Cerón", "vicerrectoria" + DOMINIO_CORREO, hash));
+    usuarioRepository.save(
+        Usuario.crear(
+            "Administración Demo",
+            "administrador.demo" + DOMINIO_CORREO,
+            hash,
+            Rol.ADMINISTRADOR,
+            null,
+            null));
+    usuarioRepository.save(
+        Usuario.crear(
+            "Visualización Demo",
+            "visualizador.demo" + DOMINIO_CORREO,
+            hash,
+            Rol.VISUALIZADOR,
+            null,
+            null));
     Usuario coordinadorIngenieria =
         usuarioRepository.save(
             Usuario.crearCoordinador(

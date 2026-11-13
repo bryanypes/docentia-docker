@@ -16,14 +16,29 @@ import { listarFacultades } from '../../facultades/services/facultadesService.js
 import { listarProgramas } from '../../programas/services/programasService.js'
 import { actualizarUsuario, crearUsuario, obtenerUsuario } from '../services/usuariosService.js'
 import './FormularioUsuario.css'
+import { useAvisos } from '../../../shared/components/ui/Avisos/avisosContext.js'
 
 /** En el orden en que más se usan: casi todas las cuentas nuevas son de docentes. */
-const ROLES_ORDENADOS = [ROLES.DOCENTE, ROLES.COORDINADOR, ROLES.VICERRECTOR]
+const ROLES_ORDENADOS = [
+  ROLES.DOCENTE,
+  ROLES.ESTUDIANTE,
+  ROLES.COORDINADOR,
+  ROLES.VICERRECTOR,
+  ROLES.ADMINISTRADOR,
+  ROLES.VISUALIZADOR,
+]
 
 const DESCRIPCION_ROL = {
-  VICERRECTOR: 'Alcance institucional: administra periodos, usuarios y ve todas las facultades.',
-  COORDINADOR: 'Ve y califica a los docentes de su facultad y carga el CSV de estudiantes.',
-  DOCENTE: 'Consulta su propia evaluación, sin notas individuales por fuente.',
+  VICERRECTOR: 'Alcance institucional: paneles, decisión de fechas y corrección de actas.',
+  ADMINISTRADOR: 'Usuarios, programas, ponderaciones y fechas. No ve notas, comentarios ni actas.',
+  VISUALIZADOR: 'Solo lectura de paneles agregados, sin datos individuales.',
+  COORDINADOR: 'Ve y coevalúa a los docentes de su facultad.',
+  DOCENTE: 'Consulta su propia evaluación, sin notas individuales por evaluador.',
+  ESTUDIANTE: 'Califica a sus profesores por cada clase en la que está matriculado.',
+}
+
+function requierePrograma(rol) {
+  return rol === ROLES.DOCENTE || rol === ROLES.ESTUDIANTE
 }
 
 /** Orden de los campos en pantalla, para el resumen de errores; `id` es el control que recibe el foco. */
@@ -56,7 +71,7 @@ function cuerpoDesde(formulario) {
     rol,
     // La facultad del docente es la de su programa: aquí solo sirve para filtrar la lista.
     idFacultad: rol === ROLES.COORDINADOR ? Number(formulario.idFacultad) : null,
-    idPrograma: rol === ROLES.DOCENTE ? Number(formulario.idPrograma) : null,
+    idPrograma: requierePrograma(rol) ? Number(formulario.idPrograma) : null,
     contrasena: formulario.contrasena || null,
   }
 }
@@ -124,6 +139,7 @@ export default function FormularioUsuario() {
 }
 
 function Formulario({ guardado, registrarSalida }) {
+  const { confirmar } = useAvisos()
   const navegar = useNavigate()
   const { alGuardar } = useOutletContext() ?? {}
   const { usuario: sesion } = useSesion()
@@ -155,9 +171,9 @@ function Formulario({ guardado, registrarSalida }) {
     (intentoEnviar ? erroresLocales[campo] : null)
 
   const { rol } = formulario
-  // El error de facultad solo aplica a coordinación; el de programa, solo a docentes.
+  // El error de facultad solo aplica a coordinación; el de programa, a docente y estudiante.
   const aplica = (campo) =>
-    (campo !== 'idFacultad' || rol === ROLES.COORDINADOR) && (campo !== 'idPrograma' || rol === ROLES.DOCENTE)
+    (campo !== 'idFacultad' || rol === ROLES.COORDINADOR) && (campo !== 'idPrograma' || requierePrograma(rol))
   const listaErrores = CAMPOS.filter(({ campo }) => aplica(campo) && errorDe(campo)).map(({ campo, id }) => ({
     id,
     mensaje: errorDe(campo),
@@ -168,7 +184,7 @@ function Formulario({ guardado, registrarSalida }) {
     !esNuevo &&
     (rol !== guardado.rol ||
       (rol === ROLES.COORDINADOR && formulario.idFacultad !== String(guardado.idFacultad ?? '')) ||
-      (rol === ROLES.DOCENTE && formulario.idPrograma !== String(guardado.idPrograma ?? '')))
+      (requierePrograma(rol) && formulario.idPrograma !== String(guardado.idPrograma ?? '')))
 
   // Cerrar o recargar la pestaña con cambios sin guardar pide confirmación al navegador.
   useEffect(() => {
@@ -209,8 +225,18 @@ function Formulario({ guardado, registrarSalida }) {
     }
   }
 
-  function salir() {
-    if (hayCambios && !window.confirm('Tienes cambios sin guardar. ¿Salir sin guardarlos?')) return
+  async function salir() {
+    if (
+      hayCambios &&
+      !(await confirmar({
+        tipo: 'alerta',
+        titulo: '¿Salir sin guardar?',
+        mensaje: 'Tienes cambios sin guardar en este formulario.',
+        textoConfirmar: 'Salir sin guardar',
+        textoCancelar: 'Seguir editando',
+      }))
+    )
+      return
     navegar(...VOLVER_A_LISTA)
   }
   useEffect(() => {
@@ -389,11 +415,11 @@ function Formulario({ guardado, registrarSalida }) {
             )}
           </fieldset>
 
-          {(rol === ROLES.COORDINADOR || rol === ROLES.DOCENTE) && (
+          {(rol === ROLES.COORDINADOR || requierePrograma(rol)) && (
             <div className="formulario-usuario__campos formulario-usuario__vinculo">
               <Campo
                 id="idFacultad"
-                etiqueta={rol === ROLES.DOCENTE ? 'Filtrar programas por facultad (opcional)' : 'Facultad que coordina'}
+                etiqueta={requierePrograma(rol) ? 'Filtrar programas por facultad (opcional)' : 'Facultad que coordina'}
                 error={rol === ROLES.COORDINADOR ? errorDe('idFacultad') : null}
               >
                 <select
@@ -408,7 +434,7 @@ function Formulario({ guardado, registrarSalida }) {
                   <option value="">
                     {facultades.cargando
                       ? 'Cargando facultades…'
-                      : rol === ROLES.DOCENTE
+                      : requierePrograma(rol)
                         ? 'Todas las facultades'
                         : 'Elige una facultad'}
                   </option>
@@ -420,8 +446,12 @@ function Formulario({ guardado, registrarSalida }) {
                 </select>
               </Campo>
 
-              {rol === ROLES.DOCENTE && (
-                <Campo id="idPrograma" etiqueta="Programa del docente" error={errorDe('idPrograma')}>
+              {requierePrograma(rol) && (
+                <Campo
+                  id="idPrograma"
+                  etiqueta={rol === ROLES.ESTUDIANTE ? 'Programa del estudiante' : 'Programa del docente'}
+                  error={errorDe('idPrograma')}
+                >
                   <select
                     id="idPrograma"
                     className="campo__control"

@@ -24,6 +24,9 @@ public class Programa {
   @JoinColumn(name = "id_facultad", nullable = false)
   private Facultad facultad;
 
+  @Column(length = 40)
+  private String codigo;
+
   @Column(nullable = false, length = 120)
   private String nombre;
 
@@ -37,7 +40,13 @@ public class Programa {
   protected Programa() {}
 
   public Programa(String nombre, Facultad facultad) {
-    this.nombre = nombre;
+    this.nombre = NombrePropio.normalizar(nombre);
+    this.facultad = facultad;
+  }
+
+  public Programa(String nombre, String codigo, Facultad facultad) {
+    this.nombre = NombrePropio.normalizar(nombre);
+    this.codigo = codigo;
     this.facultad = facultad;
   }
 
@@ -53,12 +62,20 @@ public class Programa {
     this.facultad = facultad;
   }
 
+  public String getCodigo() {
+    return codigo;
+  }
+
+  public void setCodigo(String codigo) {
+    this.codigo = codigo;
+  }
+
   public String getNombre() {
     return nombre;
   }
 
   public void setNombre(String nombre) {
-    this.nombre = nombre;
+    this.nombre = NombrePropio.normalizar(nombre);
   }
 
   public boolean getEsActivo() {

@@ -4,13 +4,19 @@ Decisiones tomadas donde la Resolución 074 de 2026, el Excel de historias o el 
 ambigüedad. La fuente de verdad es la resolución; el Excel v2 tiene errores (ver
 [RES074-TRAZABILIDAD.md](RES074-TRAZABILIDAD.md)).
 
-## Pendientes de Vicerrectoría
+## Decisiones pendientes de la institución
 
 | # | Tema | Decisión aplicada | Quién la confirma |
 |---|------|-------------------|-------------------|
 | P1 | Fuentes faltantes (Art. 3) | Se renormaliza entre las fuentes disponibles y el promedio queda PARCIAL con las faltantes expuestas. Sin ninguna fuente queda SIN_NOTA, nunca 0. | Vicerrectoría |
-| P2 | Umbral de compromisos | 3,8 por defecto, que es el inicio de la categoría Alto. El requerimiento original decía 4,00. Es configurable con `DOCENTIA_COMPROMISOS_UMBRAL`. | Vicerrectoría |
+| P2 | Umbral de compromisos | **Pendiente.** El código aplica 3,8 (inicio de la categoría Alto), configurable con `DOCENTIA_COMPROMISOS_UMBRAL`. El backlog del equipo y el requerimiento original dicen 4,00. Mientras no se decida, queda 3,8. | Vicerrectoría |
 | P3 | Quién corrige un acta firmada | Solo Vicerrectoría, con motivo. Configurable con `DOCENTIA_ACTAS_ROL_CORRECTOR`. | Vicerrectoría |
+| P4 | Docentes con menos de 5 respuestas de estudiantes | Sin decisión. Hoy no reciben nota de estudiantes del formulario; quedan PARCIAL y el acta no se firma (la carga por CSV se retiró en 0.4.0). Opciones: ampliar la ventana, bajar el mínimo o renormalizar sin estudiantes | Vicerrectoría |
+| P5 | Mínimos | 5 respuestas para la nota de estudiantes (`DOCENTIA_HETEROEVALUACION_MINIMO`) y 10 para el análisis de comentarios del formulario (`docentia.ia.minimo-encuestas`). Aplicado; falta confirmarlo | Vicerrectoría |
+| P6 | Validez de la firma electrónica simple | DOCENTIA registra cuenta, fecha, trazo y hash, con verificación pública por código; no usa certificado digital. Si sirve para actas oficiales lo decide la institución con la oficina jurídica (`FIRMA-ACTAS.md`) | Vicerrectoría y jurídica |
+| P7 | Matrícula real desde Campus/NOVA | Sin integración directa. La inscripción de estudiantes usa el servicio de matrícula del backend, sin pantalla. Falta definir de dónde y cómo llega la matrícula de cada periodo | Vicerrectoría y sistemas |
+| P8 | Modelo de lenguaje externo con datos reales | Apagado por defecto; el modelo local no usa red. Activarlo envía comentarios anonimizados a un tercero y exige revisar la política de datos (Ley 1581 de 2012) y fijar un tope de gasto | Vicerrectoría |
+| P9 | Mes de corte del nombre del periodo | AAAA-1 si inicia de enero a junio y AAAA-2 de julio a diciembre (`DOCENTIA_PERIODOS_MES_FIN_PRIMER_SEMESTRE=6`). Falta confirmar con el calendario académico | Vicerrectoría |
 
 ## Motor
 
@@ -74,7 +80,8 @@ ambigüedad. La fuente de verdad es la resolución; el Excel v2 tiene errores (v
 - **Gate de autores.** `git shortlog` muestra a Daniel Aranda y a Vero, colaboradores reales con
   commits ya públicos. Quitarlos exigiría reescribir historial, y eso está prohibido. Tus dos correos
   se unifican con `.mailmap`.
-- **Repositorio `docentia-docker`.** Su commit local quedó absorbido por el monorepo y no se sube.
+- **Repositorio `docentia-docker`.** Recibe una copia de cada versión publicada, con `backend/` y
+  `frontend/`. El desarrollo sigue en `docentia-backend` y `DocenteIA`.
 - **PostgreSQL en CI.** Las pruebas usan `embedded-postgres`, un PostgreSQL 16 real, así que no hace
   falta un servicio aparte.
 
@@ -107,8 +114,13 @@ ambigüedad. La fuente de verdad es la resolución; el Excel v2 tiene errores (v
   así que esto solo afecta el desglose visual.
 - **Escala de 1 a 5.** La resolución no la define. Sus etiquetas están en configuración
   (`docentia.formularios.etiquetas-escala`) y quedan pendientes de confirmar con Vicerrectoría.
-- **Precedencia.** La media del formulario prevalece sobre la nota previa de AUTO y COEVAL, sea manual o
-  de CSV. HETERO sigue por CSV. El reemplazo queda en el historial de correcciones.
+- **Precedencia.** La media del formulario prevalece sobre la nota previa de AUTO, COEVAL y HETERO.
+  HU-01 corta el CSV de notas: la fuente `ESTUDIANTES` sale de formularios HETERO agregados.
+  El reemplazo queda en el historial de correcciones.
+- **Unidad HETERO.** Un formulario por (estudiante, clase, docente). Clase = curso + grupo + jornada
+  del JSON de Campus. El detalle de HU-01 está en
+  [DECISIONES-HETEROEVALUACION.md](DECISIONES-HETEROEVALUACION.md) y el contrato en
+  [api-heteroevaluacion.md](api-heteroevaluacion.md).
 - **Origen.** `calificaciones.origen` admite MANUAL, CSV y FORMULARIO. Se agregó MANUAL porque los datos
   existentes y las notas registradas por pantalla no son ninguno de los otros dos.
 - **Notas por aspecto.** El instrumento no tiene los cinco aspectos anteriores. Al enviar, los cinco
@@ -122,6 +134,85 @@ ambigüedad. La fuente de verdad es la resolución; el Excel v2 tiene errores (v
 - **Auditoría.** `entidad_id` guarda el docente evaluado, y el periodo se deduce de la fecha.
 - **Desglose del docente.** Mi evaluación muestra solo su autoevaluación por criterio. `GET
   /expedientes/propio` conserva `dimensiones`, valores ya ponderados que no revelan una fuente.
+
+## Heteroevaluación (HU-01)
+
+- **Base de Daniel.** Se conservan el rol `ESTUDIANTE`, cursos, clases, matrículas y el seed de Campus
+  (V26). Su esquema de respuestas (V27) guardaba al estudiante junto a sus puntajes; V28 lo reemplaza
+  por tablas anónimas y borra esas filas, que solo existían en desarrollo.
+- **Asignación.** Es una fila de `clases_docente`, que recibió un id. Una matrícula RETIRADA es
+  `es_activa = false`.
+- **Anonimato.** `participaciones_heteroevaluacion` dice quién ya respondió; `respuestas_heteroevaluacion`
+  dice qué se respondió, con id UUID aleatorio y sin estudiante, fecha ni secuencia. Ninguna consulta,
+  log ni registro de auditoría las une.
+- **Sin borrador.** El estudiante envía una sola vez; no se guardan respuestas parciales.
+- **Mínimo de respuestas.** 5 por defecto (`docentia.heteroevaluacion.minimo-respuestas`). Por debajo,
+  el formulario no reemplaza al CSV y no se muestra ningún agregado.
+- **Nota de la fuente.** Media de todas las respuestas del docente en el periodo de la media simple de
+  sus 11 descriptores, con 4 decimales.
+- **Precedencia.** Con el mínimo, el formulario prevalece y un CSV posterior no lo pisa. Por debajo, manda
+  el CSV; si no hay CSV, la fuente queda faltante y el promedio PARCIAL.
+- **CSV restaurado.** El PR #4 había desactivado la carga CSV de estudiantes y borrado su prueba de
+  concurrencia. Ambas vuelven, porque el CSV es el respaldo por debajo del mínimo.
+- **Autenticación del estudiante.** El login con Google acepta cualquier correo institucional que exista,
+  y la matrícula crea al estudiante. Fuera de desarrollo, el estudiante importado no recibe una
+  contraseña utilizable. En desarrollo usa la contraseña de demo.
+- **Matrícula por CSV.** El curso queda en el programa del docente; la clase se crea como grupo
+  `UNICO`, porque el CSV no trae grupo ni jornada. Una columna opcional `estado` admite RETIRADA.
+- **Cobertura.** Cuenta participación, nunca puntajes. Un estudiante cuenta una vez por cada asignación,
+  y un retirado no cuenta.
+- **Comentarios hacia el análisis de IA.** En 0.3.3 se recortó: copiarlos a `comentarios_estudiantes`,
+  que tiene fecha y secuencia, los ligaba en el tiempo a la participación. Ahora no se copian: se leen de
+  la respuesta solo al analizar y con la recolección cerrada. Ver
+  [DECISIONES-ANALISIS-IA.md](DECISIONES-ANALISIS-IA.md).
+- **Profe David Melo.** No había cambios suyos en los repositorios; los cambios de usuarios y roles
+  venían del PR #4.
+
+## Proceso de retroalimentación
+
+Contrato: [api-proceso-evaluacion.md](api-proceso-evaluacion.md).
+
+- **Fuentes y pesos sin cambios.** Siguen las tres fuentes de la Res. 074 (50/30/20). Vicerrectoría
+  no califica: observa el proceso de todas las facultades.
+- **Estado calculado.** `EstadoProcesoEvaluacion` se deduce del promedio, las citas y el acta en cada
+  consulta. No hay una columna de estado que se pueda desfasar.
+- **Estudiantes completos.** Se usa el mismo criterio del motor: la fuente cuenta cuando hay al menos
+  un formulario HETERO enviado. La cobertura (respondidas de esperadas) se muestra a coordinación y
+  vicerrectoría para que decidan, pero no bloquea.
+- **Qué ve el docente.** Mientras falten estudiantes o coordinación solo sabe que su evaluación está
+  en curso. Desde que solo falta su autoevaluación ve los pasos del proceso, nunca la nota.
+- **Resultado en la reunión.** La nota, la categoría, el resultado por dimensión, los hallazgos y el
+  acta del periodo se le muestran cuando la coordinación registra que asistió. La propiedad
+  `docentia.proceso.exigir-asistencia` (por defecto `true`) permite apagarlo; las pruebas anteriores
+  a esta regla corren con `false` y `ProcesoEvaluacionTest` la activa.
+- **Confirmación.** El recordatorio de 24 h pide confirmar o declinar. Declinar libera la cita con
+  `DECLINADA_POR_DOCENTE` y la franja vuelve a estar disponible para otro docente. Solo se puede
+  responder antes de que empiece la cita.
+- **Asistencia.** La registra la coordinación desde el día de la cita, en el calendario o en el
+  expediente. `ASISTIO` exige el promedio COMPLETO; `NO_ASISTIO` libera la cita con `INASISTENCIA`
+  y el docente debe reservar otra. Después de asistir ya no puede cambiar de franja.
+- **Dos actas.** `COMPROMISO` exige al menos un compromiso con plazo; `RETROALIMENTACION` es la
+  constancia de que recibió la retroalimentación. Con la nota bajo el umbral siempre es de
+  compromiso; por encima, la coordinación elige al crearla o la cambia antes de la primera firma.
+  Las actas anteriores a V36 toman el tipo según su nota.
+- **Firma en la reunión.** Además de las reglas anteriores, el acta se firma después de registrar la
+  asistencia. El docente la firma desde su sesión, en Mi acta.
+- **Migración V36.** Agrega confirmación y asistencia a `citas` y `tipo` a `actas`. No se editó
+  ninguna migración anterior.
+
+## Firma, inicio y estadísticas
+
+- **Firma dibujada.** Se firma en un modal con un lienzo (mouse, dedo o lápiz). Quien no puede
+  dibujar escribe su nombre y se dibuja con letra manuscrita: el resultado es el mismo PNG. El
+  backend valida que sea un PNG con trazo, guarda su hash y lo imprime en el PDF (V37).
+- **Inicio único.** `/inicio` es la ruta principal de todos los roles y muestra el panel de cada uno.
+  Solo cuando la sesión vence y entra la misma persona se vuelve a la pantalla anterior; tras un
+  Salir nadie hereda la ruta del rol anterior.
+- **Estadísticas.** Vista propia para coordinación y vicerrectoría. Se calculan en el navegador con
+  `/docentes/seguimiento` y `/procesos-evaluacion`: una sola selección filtrada alimenta todas las
+  gráficas. El Inicio conserva lo accionable y enlaza a ellas.
+- **Panorama del análisis.** Sin docente elegido, Análisis muestra el avance de la facultad con
+  conteos del backend, sin textos de comentarios ni de hallazgos.
 
 ## Estructura de repositorios
 

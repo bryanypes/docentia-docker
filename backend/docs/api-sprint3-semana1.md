@@ -1,5 +1,7 @@
 # API DOCENTIA — Sprint 3, semana 1 (14–20 oct)
 
+> **Histórico.** Este documento describe la API de esa semana. La carga por CSV (`/importaciones`) se retiró en la versión 0.4.0; la referencia vigente está en `API.md` y `ROLES.md`.
+
 Endpoints nuevos o que cambiaron en esta semana. Todo lo que no aparece aquí sigue igual.
 
 ## Convenciones
@@ -36,10 +38,12 @@ Un usuario tiene **un solo rol**. El vínculo depende del rol:
 | ------------- | -------------- | -------------- |
 | `COORDINADOR` | obligatorio    | no se envía    |
 | `DOCENTE`     | opcional (*)   | obligatorio    |
+| `ESTUDIANTE`  | opcional (*)   | obligatorio (carrera) |
 | `VICERRECTOR` | no se envía    | no se envía    |
 
-(*) La facultad del docente es la de su programa. Si el formulario la envía, debe coincidir con la
-del programa; si no coincide responde 400.
+(*) La facultad del docente o del estudiante es la de su programa. Si el formulario la envía, debe
+coincidir con la del programa; si no coincide responde 400. El estudiante no lleva las clases en el
+JWT: salen de `matriculas`.
 
 El alcance ya viaja en el login (`POST /api/sesiones` → `usuario.rol`, `usuario.idFacultad`,
 `usuario.idPrograma`) y dentro del JWT; el backend filtra con eso sin volver a consultar la base.
@@ -47,7 +51,7 @@ El alcance ya viaja en el login (`POST /api/sesiones` → `usuario.rol`, `usuari
 que el token vence (8 h) o vuelve a iniciar sesión.**
 
 Todos los endpoints de `/usuarios` son solo para `VICERRECTOR` (no existe rol administrador).
-Coordinador y docente reciben 403.
+Coordinador, docente y estudiante reciben 403.
 
 ### `GET /api/usuarios?rol=`
 
@@ -127,7 +131,16 @@ migración V10 juntó las tres etapas de calificación en la recolección (de la
 Las etapas siguen siendo opcionales al crear el periodo; una etapa sin fechas cuenta como cerrada.
 Las fechas son inclusivas y se comparan contra la fecha de Colombia.
 
-Solo hay un periodo activo: activar uno desactiva el anterior (sin cambios).
+Solo hay un periodo activo: activar uno desactiva el anterior.
+
+`PUT /api/periodos-academicos/{id}/activacion` responde `409` si el periodo no tiene matrículas
+activas, porque los estudiantes dejarían de ver a sus profesores (las clases y matrículas cuelgan
+de un periodo). Con `?confirmar=true` se activa de todos modos; hace falta para arrancar un semestre
+nuevo, ya que la matrícula solo se importa con el periodo activo. Activar y desactivar quedan en
+la auditoría (`ACTIVACION_PERIODO`, `DESACTIVACION_PERIODO`).
+
+Crear o renombrar un periodo con un nombre que solo difiere en el cero del semestre de otro
+(`2026-02` y `2026-2`) responde `409`. Editar un periodo sin cambiar su nombre sigue permitido.
 
 ### `GET /api/periodos-academicos/activo/ventanas`
 
@@ -259,6 +272,10 @@ anterior (buscar y luego insertar) esa prueba fallaba por llave duplicada.
 ---
 
 ## C4 — Carga del CSV de evaluación de estudiantes
+
+**Cortado en HU-01 etapa 3.** `POST /api/importaciones/csv` y `.../validar` responden **409**
+`"La evaluación de estudiantes se responde en el formulario"`. El historial `GET` sigue. Ver
+`docs/api-heteroevaluacion.md`.
 
 Flujo en la pantalla: el coordinador elige el archivo → `POST /api/importaciones/csv/validar`
 (no guarda nada, muestra el reporte) → si `valido` es `true`, el mismo archivo va a

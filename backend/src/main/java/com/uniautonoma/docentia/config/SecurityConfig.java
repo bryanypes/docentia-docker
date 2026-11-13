@@ -66,11 +66,24 @@ public class SecurityConfig {
                 peticiones
                     .requestMatchers(HttpMethod.POST, "/sesiones")
                     .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/actuator/health/**", "/actuator/info")
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/actuator/health",
+                        "/actuator/health/liveness",
+                        "/actuator/health/readiness",
+                        "/actuator/info")
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/verificacion-actas/*")
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/sesiones/google")
+                    .permitAll()
+                    // Recuperar la contraseña es sin sesión: tres rutas exactas, sin comodines.
+                    .requestMatchers(
+                        HttpMethod.POST,
+                        "/sesiones/recuperacion",
+                        "/sesiones/recuperacion/restablecimiento")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/sesiones/recuperacion/disponibilidad")
                     .permitAll()
                     // Lo único que puede hacer una sesión con la contraseña temporal.
                     .requestMatchers(HttpMethod.GET, "/sesiones/actual")
